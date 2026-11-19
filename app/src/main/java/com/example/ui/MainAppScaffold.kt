@@ -21,7 +21,6 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -37,34 +36,25 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.credentials.CredentialManager
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.example.R
-import com.example.auth.AuthScreen
-import com.example.auth.signOut
 import com.example.content.AppLocalization
 import com.example.data.RecoveryRepository
 import com.example.model.EpisodeReflection
 import com.example.model.UiState
 import com.example.model.UrgeLogEntry
-import com.example.model.UrgeOutcome
 import com.example.model.UserChallengeProfile
 import com.example.prefs.AppLanguage
 import com.example.prefs.AppThemeColor
@@ -76,18 +66,6 @@ import com.example.ui.screens.GuideScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.JourneyLogScreen
 import com.example.ui.screens.UrgeRescueScreen
-import com.google.firebase.Firebase
-import com.google.firebase.FirebaseApp
-import com.google.firebase.Timestamp
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.auth.auth
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.launch
 
 enum class MainTab(
     val selectedIcon: ImageVector,
@@ -107,216 +85,8 @@ enum class MainTab(
     }
 }
 
-internal fun FirebaseAuth.authStateFlow(): Flow<FirebaseUser?> = callbackFlow {
-    val listener = FirebaseAuth.AuthStateListener { auth ->
-        trySend(auth.currentUser)
-    }
-    addAuthStateListener(listener)
-    awaitClose { removeAuthStateListener(listener) }
-}
-
 @Composable
 fun AppNavigation(
-    appearancePrefs: UserAppearancePrefs,
-    dailyZikrState: DailyZikrState,
-    onSelectLanguage: (AppLanguage) -> Unit,
-    onSelectThemeColor: (AppThemeColor) -> Unit,
-    onSelectThemeMode: (AppThemeMode) -> Unit,
-    onIncrementDailyZikr: () -> Unit,
-    onSelectDailyZikr: (Int) -> Unit,
-    onResetDailyZikr: () -> Unit,
-    auth: FirebaseAuth? = null
-) {
-    val context = LocalContext.current
-    val firebaseAuth = remember(auth, context) {
-        auth ?: if (FirebaseApp.getApps(context).isNotEmpty()) Firebase.auth else null
-    }
-
-    if (firebaseAuth == null) {
-        LocalSanctuaryRoot(
-            appearancePrefs = appearancePrefs,
-            dailyZikrState = dailyZikrState,
-            onSelectLanguage = onSelectLanguage,
-            onSelectThemeColor = onSelectThemeColor,
-            onSelectThemeMode = onSelectThemeMode,
-            onIncrementDailyZikr = onIncrementDailyZikr,
-            onSelectDailyZikr = onSelectDailyZikr,
-            onResetDailyZikr = onResetDailyZikr
-        )
-    } else {
-        val currentUser by firebaseAuth.authStateFlow().collectAsStateWithLifecycle(
-            initialValue = firebaseAuth.currentUser
-        )
-        val user = currentUser
-
-        if (user == null) {
-            AuthScreen(
-                language = appearancePrefs.language,
-                onSelectLanguage = onSelectLanguage,
-                onAuthSuccess = {}
-            )
-        } else {
-            val uid = user.uid
-            val displayName = user.displayName?.takeIf { it.isNotBlank() } ?: "Believer"
-            key(uid) {
-                AuthenticatedRecoveryApp(
-                    currentUserId = uid,
-                    initialDisplayName = displayName,
-                    appearancePrefs = appearancePrefs,
-                    dailyZikrState = dailyZikrState,
-                    onSelectLanguage = onSelectLanguage,
-                    onSelectThemeColor = onSelectThemeColor,
-                    onSelectThemeMode = onSelectThemeMode,
-                    onIncrementDailyZikr = onIncrementDailyZikr,
-                    onSelectDailyZikr = onSelectDailyZikr,
-                    onResetDailyZikr = onResetDailyZikr
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun LocalSanctuaryRoot(
-    appearancePrefs: UserAppearancePrefs,
-    dailyZikrState: DailyZikrState,
-    onSelectLanguage: (AppLanguage) -> Unit,
-    onSelectThemeColor: (AppThemeColor) -> Unit,
-    onSelectThemeMode: (AppThemeMode) -> Unit,
-    onIncrementDailyZikr: () -> Unit,
-    onSelectDailyZikr: (Int) -> Unit,
-    onResetDailyZikr: () -> Unit
-) {
-    val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
-    var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(1000L)
-            nowMillis = System.currentTimeMillis()
-        }
-    }
-    var profile by remember {
-        mutableStateOf(
-            UserChallengeProfile(
-                id = "local_user",
-                userId = "local_user",
-                displayName = "Believer",
-                niyyahTitle = "Clean Heart & Peace with Allah",
-                challengeStartMillis = System.currentTimeMillis(),
-                targetDays = 40L
-            )
-        )
-    }
-    var urgeLogs by remember { mutableStateOf<List<UrgeLogEntry>>(emptyList()) }
-    var reflections by remember { mutableStateOf<Map<Int, EpisodeReflection>>(emptyMap()) }
-
-    SanctuaryAppContent(
-        profile = profile,
-        urgeLogs = urgeLogs,
-        reflections = reflections,
-        currentTimeMillis = nowMillis,
-        isSaving = false,
-        snackbarHostState = snackbarHostState,
-        appearancePrefs = appearancePrefs,
-        dailyZikrState = dailyZikrState,
-        onSelectLanguage = onSelectLanguage,
-        onSelectThemeColor = onSelectThemeColor,
-        onSelectThemeMode = onSelectThemeMode,
-        onIncrementDailyZikr = onIncrementDailyZikr,
-        onSelectDailyZikr = onSelectDailyZikr,
-        onResetDailyZikr = onResetDailyZikr,
-        onUpdateChallengeConfig = { name, niyyah, start, target, done ->
-            profile = profile.copy(
-                displayName = name,
-                niyyahTitle = niyyah,
-                challengeStartMillis = start,
-                targetDays = target
-            )
-            done()
-            scope.launch {
-                snackbarHostState.showSnackbar("Challenge start time & Niyyah saved. Allah is with you.")
-            }
-        },
-        onRecordUrgeVictory = { note, intensity, dhikrCount, done ->
-            val elapsedDays = ((System.currentTimeMillis() - profile.challengeStartMillis).coerceAtLeast(0L)) / 86_400_000L
-            profile = profile.copy(
-                urgesOvercomeCount = profile.urgesOvercomeCount + 1L,
-                longestStreakDays = maxOf(profile.longestStreakDays, elapsedDays)
-            )
-            urgeLogs = listOf(
-                UrgeLogEntry(
-                    id = "log_${System.currentTimeMillis()}",
-                    userId = "local_user",
-                    outcome = UrgeOutcome.OVERCOME.name,
-                    triggerNote = note,
-                    intensity = intensity.toLong(),
-                    dhikrCount = dhikrCount.toLong(),
-                    createdAt = Timestamp.now()
-                )
-            ) + urgeLogs
-            done()
-            scope.launch {
-                snackbarHostState.showSnackbar("Alhamdulillah! You overcame this urge for Allah's sake.")
-            }
-        },
-        onRecordSlipAndReset = { note, done ->
-            val now = System.currentTimeMillis()
-            val elapsedDays = ((now - profile.challengeStartMillis).coerceAtLeast(0L)) / 86_400_000L
-            profile = profile.copy(
-                totalResetsCount = profile.totalResetsCount + 1L,
-                challengeStartMillis = now,
-                longestStreakDays = maxOf(profile.longestStreakDays, elapsedDays)
-            )
-            urgeLogs = listOf(
-                UrgeLogEntry(
-                    id = "slip_${now}",
-                    userId = "local_user",
-                    outcome = UrgeOutcome.SLIP.name,
-                    triggerNote = note,
-                    intensity = 3L,
-                    dhikrCount = 0L,
-                    createdAt = Timestamp.now()
-                )
-            ) + urgeLogs
-            done()
-            scope.launch {
-                snackbarHostState.showSnackbar("New clean start begun. Allah loves those who turn back to Him.")
-            }
-        },
-        onSaveEpisodeReflection = { epNum, text, completed ->
-            val updatedSet = profile.completedEpisodes.toMutableSet()
-            if (completed) updatedSet.add(epNum.toLong()) else updatedSet.remove(epNum.toLong())
-            profile = profile.copy(completedEpisodes = updatedSet.toList())
-            reflections = reflections + (
-                epNum to EpisodeReflection(
-                    id = "ep_$epNum",
-                    userId = "local_user",
-                    episodeNumber = epNum.toLong(),
-                    reflection = text,
-                    completed = completed,
-                    updatedAt = Timestamp.now()
-                )
-            )
-            scope.launch {
-                snackbarHostState.showSnackbar(
-                    if (completed) "Episode $epNum completed. May Allah bless your step!"
-                    else "Reflection saved for Episode $epNum."
-                )
-            }
-        },
-        onSignOutClick = {
-            scope.launch {
-                snackbarHostState.showSnackbar("Running in offline mode on this build.")
-            }
-        }
-    )
-}
-
-@Composable
-private fun AuthenticatedRecoveryApp(
-    currentUserId: String,
-    initialDisplayName: String,
     appearancePrefs: UserAppearancePrefs,
     dailyZikrState: DailyZikrState,
     onSelectLanguage: (AppLanguage) -> Unit,
@@ -327,26 +97,17 @@ private fun AuthenticatedRecoveryApp(
     onResetDailyZikr: () -> Unit
 ) {
     val viewModel: RecoveryViewModel = viewModel(
-        key = currentUserId,
         factory = viewModelFactory {
             initializer {
                 val app = checkNotNull(this[APPLICATION_KEY]) {
                     "APPLICATION_KEY missing from CreationExtras"
                 }
-                val databaseId = app.getString(R.string.firestore_database_id)
-                val db = FirebaseFirestore.getInstance(databaseId)
                 RecoveryViewModel(
-                    repository = RecoveryRepository(db),
-                    currentUserId = currentUserId,
-                    initialDisplayName = initialDisplayName
+                    repository = RecoveryRepository(app.applicationContext)
                 )
             }
         }
     )
-
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val credentialManager = remember(context) { CredentialManager.create(context) }
 
     val profileState by viewModel.profileState.collectAsStateWithLifecycle()
     val urgeLogsState by viewModel.urgeLogsState.collectAsStateWithLifecycle()
@@ -364,10 +125,6 @@ private fun AuthenticatedRecoveryApp(
         }
     }
 
-    var activeTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
-    var showUrgeRescue by rememberSaveable { mutableStateOf(false) }
-    var selectedEpisodeNumber by rememberSaveable { mutableStateOf<Int?>(null) }
-
     when (val pState = profileState) {
         is UiState.Loading -> {
             Scaffold(contentWindowInsets = WindowInsets.safeDrawing) { padding ->
@@ -383,7 +140,7 @@ private fun AuthenticatedRecoveryApp(
                     ) {
                         CircularProgressIndicator()
                         Text(
-                            text = "Preparing your sanctuary...",
+                            text = "Preparing your offline sanctuary...",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -406,7 +163,7 @@ private fun AuthenticatedRecoveryApp(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "Connection Issue",
+                            text = "Storage Issue",
                             style = MaterialTheme.typography.headlineMedium
                         )
                         Text(
@@ -414,11 +171,6 @@ private fun AuthenticatedRecoveryApp(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Button(
-                            onClick = { signOut(credentialManager, scope) }
-                        ) {
-                            Text("Sign Out & Retry")
-                        }
                     }
                 }
             }
@@ -471,14 +223,10 @@ private fun AuthenticatedRecoveryApp(
                 },
                 onSaveEpisodeReflection = { epNum, text, completed ->
                     viewModel.saveEpisodeReflection(
-                        profile = profile,
                         episodeNumber = epNum,
                         reflection = text,
                         completed = completed
                     )
-                },
-                onSignOutClick = {
-                    signOut(credentialManager, scope)
                 }
             )
         }
@@ -504,8 +252,7 @@ private fun SanctuaryAppContent(
     onUpdateChallengeConfig: (String, String, Long, Long, () -> Unit) -> Unit,
     onRecordUrgeVictory: (String, Int, Int, () -> Unit) -> Unit,
     onRecordSlipAndReset: (String, () -> Unit) -> Unit,
-    onSaveEpisodeReflection: (Int, String, Boolean) -> Unit,
-    onSignOutClick: () -> Unit
+    onSaveEpisodeReflection: (Int, String, Boolean) -> Unit
 ) {
     var activeTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     var showUrgeRescue by rememberSaveable { mutableStateOf(false) }
@@ -653,8 +400,7 @@ private fun SanctuaryAppContent(
                                 appearancePrefs = appearancePrefs,
                                 onSelectLanguage = onSelectLanguage,
                                 onSelectThemeColor = onSelectThemeColor,
-                                onSelectThemeMode = onSelectThemeMode,
-                                onSignOutClick = onSignOutClick
+                                onSelectThemeMode = onSelectThemeMode
                             )
                         }
                     }

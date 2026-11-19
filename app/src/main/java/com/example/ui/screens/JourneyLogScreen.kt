@@ -19,11 +19,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.InstallMobile
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.OfflinePin
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shield
@@ -32,7 +32,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,7 +39,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.content.AppLocalization
@@ -54,6 +52,7 @@ import com.example.prefs.AppThemeMode
 import com.example.prefs.UserAppearancePrefs
 import com.example.ui.components.AppearanceControlsContent
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -64,8 +63,7 @@ fun JourneyLogScreen(
     appearancePrefs: UserAppearancePrefs,
     onSelectLanguage: (AppLanguage) -> Unit,
     onSelectThemeColor: (AppThemeColor) -> Unit,
-    onSelectThemeMode: (AppThemeMode) -> Unit,
-    onSignOutClick: () -> Unit
+    onSelectThemeMode: (AppThemeMode) -> Unit
 ) {
     val copy = AppLocalization.getUiCopy(appearancePrefs.language)
     val startMillis = if (profile.challengeStartMillis > 0L) profile.challengeStartMillis else currentTimeMillis
@@ -86,7 +84,7 @@ fun JourneyLogScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 1. User Account Card
+            // 1. Offline Local Sanctuary Card (No Sign-In / Sign-Up)
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -95,36 +93,72 @@ fun JourneyLogScreen(
                     ),
                     shape = RoundedCornerShape(22.dp)
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(18.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = profile.displayName,
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Urges Overcome: ${profile.urgesOvercomeCount} • Resets: ${profile.totalResetsCount}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        OutlinedButton(
-                            onClick = onSignOutClick,
-                            modifier = Modifier.testTag("sign_out_button")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Logout,
-                                contentDescription = "Sign out",
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Sign Out")
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = profile.displayName,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Urges Overcome: ${profile.urgesOvercomeCount} • Resets: ${profile.totalResetsCount}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(50)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.OfflinePin,
+                                        contentDescription = copy.offlineBadgeTitle,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Offline",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+                        }
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = copy.offlineBadgeTitle,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = copy.offlineBadgeSubtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -326,11 +360,15 @@ fun JourneyLogScreen(
             } else {
                 items(
                     items = urgeLogs,
-                    key = { it.id.ifBlank { "${it.createdAt?.seconds}_${it.outcome}" } }
+                    key = { it.id.ifBlank { "${it.createdAtMillis}_${it.outcome}" } }
                 ) { entry ->
                     val outcome = UrgeOutcome.fromRaw(entry.outcome)
                     val isVictory = outcome == UrgeOutcome.OVERCOME
-                    val dateStr = entry.createdAt?.toDate()?.let { formatter.format(it) } ?: "Just now"
+                    val dateStr = if (entry.createdAtMillis > 0L) {
+                        formatter.format(Date(entry.createdAtMillis))
+                    } else {
+                        "Just now"
+                    }
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(

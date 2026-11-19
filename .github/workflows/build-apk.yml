@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -55,11 +58,25 @@ jobs:
           fi
 
       - name: Build Debug APK
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
+        run: |
+          gradle :app:assembleDebug --no-daemon --stacktrace
+          cp app/build/outputs/apk/debug/app-debug.apk Allah-always-with-me.apk
+
+      - name: Publish Direct APK to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view latest >/dev/null 2>&1; then
+            gh release upload latest Allah-always-with-me.apk --clobber
+          else
+            gh release create latest Allah-always-with-me.apk \
+              --title "Allah always with me (Offline APK)" \
+              --notes "100% Offline APK (English & Urdu, no Sign-In/Sign-Up). Uninstall any previous build before installing if updating from another source."
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Allah-always-with-me-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: Allah-always-with-me.apk
           if-no-files-found: error

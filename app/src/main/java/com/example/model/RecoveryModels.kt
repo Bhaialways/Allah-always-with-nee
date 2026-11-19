@@ -1,16 +1,8 @@
 package com.example.model
 
-import androidx.annotation.Keep
-import com.google.firebase.Timestamp
-import com.google.firebase.firestore.DocumentId
-import com.google.firebase.firestore.IgnoreExtraProperties
-import com.google.firebase.firestore.ServerTimestamp
-
-@Keep
-@IgnoreExtraProperties
 data class UserChallengeProfile(
-    @DocumentId val id: String = "",
-    val userId: String = "",
+    val id: String = "local_user",
+    val userId: String = "local_user",
     val displayName: String = "Believer",
     val niyyahTitle: String = "Clean Heart & Peace with Allah",
     val challengeStartMillis: Long = 0L,
@@ -19,8 +11,8 @@ data class UserChallengeProfile(
     val urgesOvercomeCount: Long = 0L,
     val totalResetsCount: Long = 0L,
     val completedEpisodes: List<Long> = emptyList(),
-    @ServerTimestamp val createdAt: Timestamp? = null,
-    @ServerTimestamp val updatedAt: Timestamp? = null
+    val createdAtMillis: Long = 0L,
+    val updatedAtMillis: Long = 0L
 )
 
 enum class UrgeOutcome {
@@ -33,28 +25,22 @@ enum class UrgeOutcome {
     }
 }
 
-@Keep
-@IgnoreExtraProperties
 data class UrgeLogEntry(
-    @DocumentId val id: String = "",
-    val userId: String = "",
+    val id: String = "",
     val outcome: String = UrgeOutcome.OVERCOME.name,
     val triggerNote: String = "",
     val intensity: Long = 3L,
     val dhikrCount: Long = 0L,
-    @ServerTimestamp val createdAt: Timestamp? = null
+    val createdAtMillis: Long = 0L
 )
 
-@Keep
-@IgnoreExtraProperties
 data class EpisodeReflection(
-    @DocumentId val id: String = "",
-    val userId: String = "",
+    val id: String = "",
     val episodeNumber: Long = 1L,
     val reflection: String = "",
     val completed: Boolean = false,
-    @ServerTimestamp val createdAt: Timestamp? = null,
-    @ServerTimestamp val updatedAt: Timestamp? = null
+    val createdAtMillis: Long = 0L,
+    val updatedAtMillis: Long = 0L
 )
 
 sealed interface UiState<out T> {

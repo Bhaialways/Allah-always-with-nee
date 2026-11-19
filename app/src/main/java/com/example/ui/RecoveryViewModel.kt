@@ -8,7 +8,6 @@ import com.example.model.EpisodeReflection
 import com.example.model.UiState
 import com.example.model.UrgeLogEntry
 import com.example.model.UserChallengeProfile
-import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,9 +21,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class RecoveryViewModel(
-    private val repository: RecoveryRepository,
-    private val currentUserId: String,
-    private val initialDisplayName: String
+    private val repository: RecoveryRepository
 ) : ViewModel() {
 
     private val _actionMessage = MutableStateFlow<String?>(null)
@@ -33,7 +30,6 @@ class RecoveryViewModel(
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
 
-    // Live 1-second ticker for the Sober Step elapsed counter
     val currentTimeMillis: StateFlow<Long> = flow {
         while (true) {
             emit(System.currentTimeMillis())
@@ -46,7 +42,7 @@ class RecoveryViewModel(
     )
 
     val profileState: StateFlow<UiState<UserChallengeProfile>> =
-        repository.observeProfile(currentUserId)
+        repository.observeProfile()
             .map<UserChallengeProfile?, UiState<UserChallengeProfile>> { profile ->
                 if (profile != null) {
                     UiState.Success(profile)
@@ -55,13 +51,9 @@ class RecoveryViewModel(
                 }
             }
             .catch { error ->
-                val firestoreError = generateSequence(error) { it.cause }
-                    .filterIsInstance<FirebaseFirestoreException>()
-                    .firstOrNull()
-                if (firestoreError == null && error is CancellationException) throw error
-                val root = firestoreError ?: error
-                Log.w(TAG, "Error observing user profile", root)
-                emit(UiState.Error(root.message ?: "Unable to load your challenge profile."))
+                if (error is CancellationException) throw error
+                Log.w(TAG, "Error observing local profile", error)
+                emit(UiState.Error(error.message ?: "Unable to load your local challenge profile."))
             }
             .stateIn(
                 scope = viewModelScope,
@@ -70,16 +62,12 @@ class RecoveryViewModel(
             )
 
     val urgeLogsState: StateFlow<UiState<List<UrgeLogEntry>>> =
-        repository.observeUrgeLogs(currentUserId)
+        repository.observeUrgeLogs()
             .map<List<UrgeLogEntry>, UiState<List<UrgeLogEntry>>> { UiState.Success(it) }
             .catch { error ->
-                val firestoreError = generateSequence(error) { it.cause }
-                    .filterIsInstance<FirebaseFirestoreException>()
-                    .firstOrNull()
-                if (firestoreError == null && error is CancellationException) throw error
-                val root = firestoreError ?: error
-                Log.w(TAG, "Error observing urge logs", root)
-                emit(UiState.Error(root.message ?: "Unable to load urge history."))
+                if (error is CancellationException) throw error
+                Log.w(TAG, "Error observing local urge logs", error)
+                emit(UiState.Error(error.message ?: "Unable to load urge history."))
             }
             .stateIn(
                 scope = viewModelScope,
@@ -88,18 +76,14 @@ class RecoveryViewModel(
             )
 
     val reflectionsState: StateFlow<UiState<Map<Int, EpisodeReflection>>> =
-        repository.observeEpisodeReflections(currentUserId)
+        repository.observeEpisodeReflections()
             .map<Map<Int, EpisodeReflection>, UiState<Map<Int, EpisodeReflection>>> {
                 UiState.Success(it)
             }
             .catch { error ->
-                val firestoreError = generateSequence(error) { it.cause }
-                    .filterIsInstance<FirebaseFirestoreException>()
-                    .firstOrNull()
-                if (firestoreError == null && error is CancellationException) throw error
-                val root = firestoreError ?: error
-                Log.w(TAG, "Error observing episode notes", root)
-                emit(UiState.Error(root.message ?: "Unable to load episode progress."))
+                if (error is CancellationException) throw error
+                Log.w(TAG, "Error observing local episode notes", error)
+                emit(UiState.Error(error.message ?: "Unable to load episode progress."))
             }
             .stateIn(
                 scope = viewModelScope,
@@ -109,7 +93,7 @@ class RecoveryViewModel(
 
     init {
         viewModelScope.launch {
-            val result = repository.ensureInitialProfile(currentUserId, initialDisplayName)
+            val result = repository.ensureInitialProfile()
             result.onFailure { err ->
                 _actionMessage.value = err.localizedMessage ?: "Failed to initialize profile."
             }
@@ -130,7 +114,6 @@ class RecoveryViewModel(
         viewModelScope.launch {
             _isSaving.value = true
             val result = repository.updateChallengeConfig(
-                userId = currentUserId,
                 displayName = displayName,
                 niyyahTitle = niyyahTitle,
                 challengeStartMillis = challengeStartMillis,
@@ -158,7 +141,6 @@ class RecoveryViewModel(
             val elapsedDays = computeElapsedDays(profile.challengeStartMillis)
             val bestStreak = maxOf(profile.longestStreakDays, elapsedDays)
             val result = repository.recordUrgeVictory(
-                userId = currentUserId,
                 newUrgesOvercomeCount = profile.urgesOvercomeCount + 1L,
                 longestStreakDays = bestStreak,
                 triggerNote = triggerNote,
@@ -186,7 +168,6 @@ class RecoveryViewModel(
             val bestStreak = maxOf(profile.longestStreakDays, elapsedDays)
             val nowMillis = System.currentTimeMillis()
             val result = repository.recordSlipAndReset(
-                userId = currentUserId,
                 newTotalResetsCount = profile.totalResetsCount + 1L,
                 newStartMillis = nowMillis,
                 longestStreakDays = bestStreak,
@@ -203,7 +184,6 @@ class RecoveryViewModel(
     }
 
     fun saveEpisodeReflection(
-        profile: UserChallengeProfile,
         episodeNumber: Int,
         reflection: String,
         completed: Boolean,
@@ -211,18 +191,10 @@ class RecoveryViewModel(
     ) {
         viewModelScope.launch {
             _isSaving.value = true
-            val currentList = profile.completedEpisodes.toMutableSet()
-            if (completed) {
-                currentList.add(episodeNumber.toLong())
-            } else {
-                currentList.remove(episodeNumber.toLong())
-            }
             val result = repository.saveEpisodeReflection(
-                userId = currentUserId,
                 episodeNumber = episodeNumber,
                 reflection = reflection,
-                completed = completed,
-                updatedCompletedList = currentList.toList()
+                completed = completed
             )
             _isSaving.value = false
             result.onSuccess {

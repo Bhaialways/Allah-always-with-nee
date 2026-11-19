@@ -12,7 +12,6 @@ private val Context.appearanceDataStore by preferencesDataStore(name = "sanctuar
 
 enum class AppLanguage(val code: String, val label: String, val nativeLabel: String) {
     ENGLISH("en", "English", "English"),
-    ROMAN_URDU("roman_ur", "Roman Urdu", "Roman Urdu"),
     URDU("ur", "Urdu", "اردو");
 
     companion object {
