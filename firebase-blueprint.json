@@ -1,0 +1,172 @@
+{
+  "entities": {
+    "UserChallengeProfile": {
+      "title": "UserChallengeProfile",
+      "description": "Stores the user's sobriety challenge start timestamp, target days, streak records, and completed recovery episodes.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase user UID."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User's preferred display name."
+        },
+        "niyyahTitle": {
+          "type": "string",
+          "description": "User's personal intention (Niyyah) or challenge goal title."
+        },
+        "challengeStartMillis": {
+          "type": "integer",
+          "description": "Epoch milliseconds for the user's chosen challenge start date and time."
+        },
+        "targetDays": {
+          "type": "integer",
+          "description": "Target challenge duration in days."
+        },
+        "longestStreakDays": {
+          "type": "integer",
+          "description": "Longest strike-free streak achieved in days."
+        },
+        "urgesOvercomeCount": {
+          "type": "integer",
+          "description": "Total number of urges overcome."
+        },
+        "totalResetsCount": {
+          "type": "integer",
+          "description": "Total number of streak resets."
+        },
+        "completedEpisodes": {
+          "type": "array",
+          "description": "List of completed episode numbers (1 to 11)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last-updated timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "niyyahTitle",
+        "challengeStartMillis",
+        "targetDays",
+        "longestStreakDays",
+        "urgesOvercomeCount",
+        "totalResetsCount",
+        "completedEpisodes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UrgeLogEntry": {
+      "title": "UrgeLogEntry",
+      "description": "Logs each urge victory or slip event with intensity, dhikr count, and reflection note.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase user UID."
+        },
+        "outcome": {
+          "type": "string",
+          "enum": ["OVERCOME", "SLIP"],
+          "description": "Whether the urge was overcome or resulted in a slip."
+        },
+        "triggerNote": {
+          "type": "string",
+          "description": "Optional note about the trigger or reflection."
+        },
+        "intensity": {
+          "type": "integer",
+          "description": "Urge intensity on a 1 to 5 scale."
+        },
+        "dhikrCount": {
+          "type": "integer",
+          "description": "Number of dhikr/istighfar taps completed during the urge."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the log was recorded."
+        }
+      },
+      "required": [
+        "userId",
+        "outcome",
+        "triggerNote",
+        "intensity",
+        "dhikrCount",
+        "createdAt"
+      ]
+    },
+    "EpisodeReflection": {
+      "title": "EpisodeReflection",
+      "description": "User's completion status and personal reflection note for a specific recovery guide episode (1-11).",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase user UID."
+        },
+        "episodeNumber": {
+          "type": "integer",
+          "description": "Episode number from 1 to 11."
+        },
+        "reflection": {
+          "type": "string",
+          "description": "Personal reflection or dua note written by the user."
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Whether the user marked the episode as completed."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "userId",
+        "episodeNumber",
+        "reflection",
+        "completed",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserChallengeProfile"
+      },
+      "description": "User's private sobriety challenge profile and streak configuration."
+    },
+    "/users/{userId}/urgeLogs/{logId}": {
+      "schema": {
+        "$ref": "#/entities/UrgeLogEntry"
+      },
+      "description": "User's private urge victory and slip history logs."
+    },
+    "/users/{userId}/episodeNotes/{episodeId}": {
+      "schema": {
+        "$ref": "#/entities/EpisodeReflection"
+      },
+      "description": "User's private completion status and reflections for the 11 recovery episodes."
+    }
+  }
+}

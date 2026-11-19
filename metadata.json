@@ -1,0 +1,6 @@
+{
+  "name": "Allah always with me",
+  "description": "A spiritual and emotional sobriety recovery companion with a custom challenge timer, an 11-episode recovery guide, and instant urge-relief tools reminding you of Allah's help.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
